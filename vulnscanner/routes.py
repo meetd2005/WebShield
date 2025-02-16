@@ -242,6 +242,7 @@ def test_scan_report():
         completed_at=datetime.utcnow()
     )
     db.session.add(scan)
+    db.session.commit()  # Commit here to get the scan ID
 
     # Sample vulnerabilities with different severities
     vulnerabilities = [
@@ -296,7 +297,7 @@ def test_scan_report():
 
     # Create test report
     report = Report(
-        scan_id=scan.id,
+        scan_id=scan.id,  # Now we have a valid scan ID
         summary={
             "high": 1,
             "medium": 1,
