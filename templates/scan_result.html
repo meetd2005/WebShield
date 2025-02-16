@@ -157,10 +157,10 @@
                                         <i class="fas fa-arrow-right me-2"></i>HTTP Request
                                     </h6>
                                     <div class="bg-dark p-3 rounded border border-secondary">
-                                        <pre class="mb-0"><code class="language-http">Method: {{ vuln.request_data.method }}
-URL: {{ vuln.request_data.url }}
-Headers: {{ vuln.request_data.headers|tojson(indent=2) }}
-Body: {{ vuln.request_data.body|tojson(indent=2) }}</code></pre>
+                                        <pre class="mb-0"><code class="language-http">{% set request_data = vuln.get('request_data', {}) %}Method: {{ request_data.get('method', 'GET') }}
+URL: {{ request_data.get('url', '') }}
+Headers: {{ request_data.get('headers', {}) | tojson(indent=2) if request_data.get('headers') else '{}' }}
+Body: {% if request_data.get('body') %}{{ request_data.get('body') | tojson(indent=2) }}{% else %}{}{% endif %}</code></pre>
                                     </div>
                                 </div>
 
@@ -170,9 +170,9 @@ Body: {{ vuln.request_data.body|tojson(indent=2) }}</code></pre>
                                         <i class="fas fa-arrow-left me-2"></i>HTTP Response
                                     </h6>
                                     <div class="bg-dark p-3 rounded border border-secondary">
-                                        <pre class="mb-0"><code class="language-http">Status Code: {{ vuln.response_data.status_code }}
-Headers: {{ vuln.response_data.headers|tojson(indent=2) }}
-Body: {{ vuln.response_data.body }}</code></pre>
+                                        <pre class="mb-0"><code class="language-http">{% set response_data = vuln.get('response_data', {}) %}Status Code: {{ response_data.get('status_code', 0) }}
+Headers: {{ response_data.get('headers', {}) | tojson(indent=2) if response_data.get('headers') else '{}' }}
+Body: {% if response_data.get('body') %}{{ response_data.get('body') | tojson(indent=2) }}{% else %}{}{% endif %}</code></pre>
                                     </div>
                                 </div>
 
