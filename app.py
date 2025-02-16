@@ -12,7 +12,11 @@ db = SQLAlchemy(model_class=Base)
 app = Flask(__name__)
 
 # Configure the application
-app.secret_key = os.environ.get("SESSION_SECRET", "your-secret-key-for-dev")
+if not os.environ.get("SESSION_SECRET"):
+    print("Error: SESSION_SECRET environment variable is not set", file=sys.stderr)
+    sys.exit(1)
+
+app.secret_key = os.environ.get("SESSION_SECRET")
 
 # Handle database URL configuration with error checking
 database_url = os.environ.get("DATABASE_URL")

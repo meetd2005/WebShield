@@ -227,3 +227,86 @@ def register():
 def logout():
     logout_user()
     return redirect(url_for("login"))
+
+@app.route("/test/scan-report")
+@login_required
+def test_scan_report():
+    """Test route to generate a sample vulnerability report"""
+    # Create a test scan
+    scan = Scan(
+        user_id=current_user.id,
+        target="https://example.com",
+        scan_type="test",
+        status="completed",
+        started_at=datetime.utcnow(),
+        completed_at=datetime.utcnow()
+    )
+    db.session.add(scan)
+
+    # Sample vulnerabilities with different severities
+    vulnerabilities = [
+        {
+            "type": "SQL Injection",
+            "severity": "high",
+            "details": "Found potential SQL injection in login form",
+            "request_data": {
+                "method": "POST",
+                "url": "/login",
+                "headers": {"Content-Type": "application/json"},
+                "body": {"username": "test' OR '1'='1"}
+            },
+            "response_data": {
+                "status_code": 500,
+                "headers": {"Server": "nginx"},
+                "body": "Database error occurred"
+            }
+        },
+        {
+            "type": "XSS Vulnerability",
+            "severity": "medium",
+            "details": "Cross-site scripting vulnerability in comment section",
+            "request_data": {
+                "method": "POST",
+                "url": "/comments",
+                "headers": {"Content-Type": "application/json"},
+                "body": {"content": "<script>alert('xss')</script>"}
+            },
+            "response_data": {
+                "status_code": 200,
+                "headers": {"Server": "nginx"},
+                "body": "Comment posted successfully"
+            }
+        },
+        {
+            "type": "Missing Security Headers",
+            "severity": "low",
+            "details": "Security headers X-Frame-Options and CSP are missing",
+            "request_data": {
+                "method": "GET",
+                "url": "/",
+                "headers": {}
+            },
+            "response_data": {
+                "status_code": 200,
+                "headers": {"Server": "nginx"},
+                "body": "Homepage content"
+            }
+        }
+    ]
+
+    # Create test report
+    report = Report(
+        scan_id=scan.id,
+        summary={
+            "high": 1,
+            "medium": 1,
+            "low": 1,
+            "info": 0
+        },
+        vulnerabilities=vulnerabilities,
+        created_at=datetime.utcnow()
+    )
+    db.session.add(report)
+    db.session.commit()
+
+    return redirect(url_for('view_report', report_id=report.id))
