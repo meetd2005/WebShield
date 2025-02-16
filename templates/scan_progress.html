@@ -7,7 +7,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h2 mb-0">Scan Progress</h1>
         <div class="d-flex align-items-center">
-            <span class="badge bg-info me-2">
+            <span class="badge bg-info me-2" id="scanStatus">
                 <span class="spinner-border spinner-border-sm me-2"></span>
                 In Progress
             </span>
@@ -37,12 +37,15 @@
                 <span>Scan Progress</span>
                 <span class="scan-progress-text">0%</span>
             </div>
-            <div class="progress bg-secondary">
+            <div class="progress bg-secondary mb-3">
                 <div class="progress-bar progress-bar-striped progress-bar-animated" 
                      role="progressbar" style="width: 0%" 
                      aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
             </div>
-            <small class="text-muted mt-2 d-block scan-status-message">Initializing scan...</small>
+            <div class="scan-phase-indicator">
+                <small class="text-muted d-block scan-status-message">Initializing scan...</small>
+                <small class="text-info d-block current-phase mt-1"></small>
+            </div>
         </div>
     </div>
 </div>
@@ -52,42 +55,92 @@ document.addEventListener('DOMContentLoaded', function() {
     const progressBar = document.querySelector('.progress-bar');
     const progressText = document.querySelector('.scan-progress-text');
     const statusMessage = document.querySelector('.scan-status-message');
+    const currentPhase = document.querySelector('.current-phase');
+    const scanStatus = document.getElementById('scanStatus');
     const cancelButton = document.getElementById('cancelScan');
+
+    const phases = {
+        10: 'Setting up scan environment...',
+        25: 'Checking security headers...',
+        30: 'Running port and service scan...',
+        50: 'Analyzing web vulnerabilities...',
+        70: 'Performing deep vulnerability analysis...',
+        80: 'Checking SSL certificates...',
+        90: 'Running additional security checks...',
+        100: 'Completing scan and generating report...'
+    };
+
+    let lastProgress = 0;
+    let retryCount = 0;
+    const maxRetries = 3;
 
     const checkStatus = async () => {
         try {
             const response = await fetch("{{ url_for('scan_status', scan_id=scan.id) }}");
             const data = await response.json();
 
+            // Reset retry count on successful response
+            retryCount = 0;
+
             if (data.status === 'completed') {
                 progressBar.style.width = '100%';
                 progressBar.setAttribute('aria-valuenow', 100);
                 progressText.textContent = '100%';
                 statusMessage.textContent = 'Scan completed successfully!';
-                window.location.reload();
+                scanStatus.innerHTML = '<i class="fas fa-check-circle me-2"></i>Completed';
+                scanStatus.classList.replace('bg-info', 'bg-success');
+
+                // Redirect to results page after a short delay
+                setTimeout(() => {
+                    window.location.href = "{{ url_for('view_report', report_id=scan.reports[0].id) if scan.reports else url_for('dashboard') }}";
+                }, 1500);
                 return;
             } else if (data.status === 'failed') {
                 statusMessage.textContent = 'Scan failed. Please try again.';
                 progressBar.classList.remove('bg-info');
                 progressBar.classList.add('bg-danger');
+                scanStatus.innerHTML = '<i class="fas fa-exclamation-circle me-2"></i>Failed';
+                scanStatus.classList.replace('bg-info', 'bg-danger');
                 return;
             } else if (data.status === 'cancelled') {
                 statusMessage.textContent = 'Scan was cancelled.';
                 progressBar.classList.remove('bg-info');
                 progressBar.classList.add('bg-warning');
+                scanStatus.innerHTML = '<i class="fas fa-ban me-2"></i>Cancelled';
+                scanStatus.classList.replace('bg-info', 'bg-warning');
                 return;
             }
 
             // Update progress
             const progress = data.progress || 0;
-            progressBar.style.width = `${progress}%`;
-            progressBar.setAttribute('aria-valuenow', progress);
-            progressText.textContent = `${Math.round(progress)}%`;
-            
-            setTimeout(checkStatus, 2000);
+            if (progress > lastProgress) {  // Only update if progress has increased
+                progressBar.style.width = `${progress}%`;
+                progressBar.setAttribute('aria-valuenow', progress);
+                progressText.textContent = `${Math.round(progress)}%`;
+                lastProgress = progress;
+
+                // Update phase message
+                const currentPhaseThreshold = Object.keys(phases)
+                    .filter(threshold => threshold <= progress)
+                    .pop();
+                if (currentPhaseThreshold) {
+                    currentPhase.textContent = phases[currentPhaseThreshold];
+                }
+            }
+
+            setTimeout(checkStatus, 1000);  // Poll every second
         } catch (error) {
             console.error('Error checking scan status:', error);
-            statusMessage.textContent = 'Error updating scan status';
+            retryCount++;
+
+            if (retryCount <= maxRetries) {
+                statusMessage.textContent = `Error updating scan status. Retrying... (${retryCount}/${maxRetries})`;
+                setTimeout(checkStatus, 2000 * retryCount);  // Exponential backoff
+            } else {
+                statusMessage.textContent = 'Error: Unable to update scan status. Please refresh the page.';
+                scanStatus.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Error';
+                scanStatus.classList.replace('bg-info', 'bg-danger');
+            }
         }
     };
 
@@ -98,11 +151,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     method: 'POST'
                 });
                 const data = await response.json();
-                
+
                 if (data.status === 'cancelled') {
                     statusMessage.textContent = 'Scan cancelled successfully.';
                     progressBar.classList.remove('bg-info');
                     progressBar.classList.add('bg-warning');
+                    scanStatus.innerHTML = '<i class="fas fa-ban me-2"></i>Cancelled';
+                    scanStatus.classList.replace('bg-info', 'bg-warning');
                 }
             } catch (error) {
                 console.error('Error cancelling scan:', error);

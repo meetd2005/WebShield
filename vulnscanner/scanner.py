@@ -215,15 +215,33 @@ class SecurityScanner:
             'vulnerabilities': []
         }
 
-        # Basic security checks
-        results['vulnerabilities'].extend(self.check_security_headers(target))
-        results['vulnerabilities'].extend(self.check_web_vulnerabilities(target))
+        try:
+            # Basic security header checks (25%)
+            yield 25
+            results['vulnerabilities'].extend(self.check_security_headers(target))
 
-        if target.startswith('https'):
-            hostname = urllib.parse.urlparse(target).netloc
-            results['vulnerabilities'].extend(self.check_ssl_certificate(hostname))
+            # Web vulnerability checks (50%)
+            yield 50
+            results['vulnerabilities'].extend(self.check_web_vulnerabilities(target))
 
-        return results
+            # SSL certificate checks if HTTPS (75%)
+            if target.startswith('https'):
+                yield 75
+                hostname = urllib.parse.urlparse(target).netloc
+                results['vulnerabilities'].extend(self.check_ssl_certificate(hostname))
+
+            # Completion (100%)
+            yield 100
+            return results
+        except Exception as e:
+            logging.error(f"Quick scan error: {str(e)}")
+            return {
+                'timestamp': datetime.now().isoformat(),
+                'target': target,
+                'scan_type': 'quick',
+                'status': 'failed',
+                'error': str(e)
+            }
 
     def full_scan(self, target):
         """Comprehensive security scan"""
@@ -244,82 +262,105 @@ class SecurityScanner:
             'vulnerabilities': []
         }
 
-        hostname = urllib.parse.urlparse(target).netloc
-
-        # Comprehensive port and service scan
         try:
-            self.nm.scan(hostname, arguments='-sS -sV -O --script vuln')
-            for host in self.nm.all_hosts():
-                os_match = self.nm[host].get('osmatch', [])
-                if os_match:
-                    results['vulnerabilities'].append({
-                        'type': 'os_detection',
-                        'severity': 'info',
-                        'details': f'Operating System detected: {os_match[0]["name"]} ({os_match[0]["accuracy"]}% accuracy)'
-                    })
+            hostname = urllib.parse.urlparse(target).netloc
 
-                for proto in self.nm[host].all_protocols():
-                    ports = self.nm[host][proto].keys()
-                    for port in ports:
-                        service = self.nm[host][proto][port]
-                        script_output = service.get('script', {})
+            # Initial setup (10%)
+            yield 10
 
-                        if script_output:
-                            for script_name, output in script_output.items():
-                                if 'VULNERABLE' in output:
-                                    results['vulnerabilities'].append({
-                                        'type': 'service_vulnerability',
-                                        'severity': 'high',
-                                        'details': f'Vulnerability detected in {service["name"]} on port {port}: {script_name}'
-                                    })
-        except Exception as e:
-            logging.error(f"Full port scan error: {str(e)}")
-
-        # Add all security checks
-        results['vulnerabilities'].extend(self.check_security_headers(target))
-        results['vulnerabilities'].extend(self.check_web_vulnerabilities(target))
-
-        if target.startswith('https'):
-            results['vulnerabilities'].extend(self.check_ssl_certificate(hostname))
-
-        # Additional checks for web applications
-        try:
-            response = requests.get(target)
-            soup = BeautifulSoup(response.text, 'html.parser')
-
-            # Check for exposed sensitive files
-            sensitive_paths = ['/admin', '/phpinfo.php', '/wp-admin', '/.git', '/.env']
-            for path in sensitive_paths:
-                try:
-                    check_url = urllib.parse.urljoin(target, path)
-                    r = requests.head(check_url, allow_redirects=False)
-                    if r.status_code != 404:
+            # Port and service scan (30%)
+            try:
+                self.nm.scan(hostname, arguments='-sS -sV -O --script vuln')
+                yield 30
+                for host in self.nm.all_hosts():
+                    os_match = self.nm[host].get('osmatch', [])
+                    if os_match:
                         results['vulnerabilities'].append({
-                            'type': 'sensitive_path',
-                            'severity': 'high',
-                            'details': f'Potentially sensitive path accessible: {path}'
+                            'type': 'os_detection',
+                            'severity': 'info',
+                            'details': f'Operating System detected: {os_match[0]["name"]} ({os_match[0]["accuracy"]}% accuracy)'
                         })
-                except:
-                    continue
 
-            # Check for forms without CSRF protection
-            forms = soup.find_all('form')
-            for form in forms:
-                csrf_found = False
-                for input_tag in form.find_all('input'):
-                    if input_tag.get('name', '').lower() in ['csrf', 'csrf_token', '_token']:
-                        csrf_found = True
-                        break
-                if not csrf_found:
-                    results['vulnerabilities'].append({
-                        'type': 'csrf_vulnerability',
-                        'severity': 'medium',
-                        'details': f'Form found without CSRF protection: {form.get("action", "unknown")}'
-                    })
+                    for proto in self.nm[host].all_protocols():
+                        ports = self.nm[host][proto].keys()
+                        for port in ports:
+                            service = self.nm[host][proto][port]
+                            script_output = service.get('script', {})
+
+                            if script_output:
+                                for script_name, output in script_output.items():
+                                    if 'VULNERABLE' in output:
+                                        results['vulnerabilities'].append({
+                                            'type': 'service_vulnerability',
+                                            'severity': 'high',
+                                            'details': f'Vulnerability detected in {service["name"]} on port {port}: {script_name}'
+                                        })
+            except Exception as e:
+                logging.error(f"Full port scan error: {str(e)}")
+
+            # Security header checks (50%)
+            yield 50
+            results['vulnerabilities'].extend(self.check_security_headers(target))
+
+            # Web vulnerability checks (70%)
+            yield 70
+            results['vulnerabilities'].extend(self.check_web_vulnerabilities(target))
+
+            # SSL certificate checks if HTTPS (80%)
+            if target.startswith('https'):
+                yield 80
+                results['vulnerabilities'].extend(self.check_ssl_certificate(hostname))
+
+            # Additional web application checks (90%)
+            try:
+                yield 90
+                response = requests.get(target)
+                soup = BeautifulSoup(response.text, 'html.parser')
+
+                # Check for exposed sensitive files
+                sensitive_paths = ['/admin', '/phpinfo.php', '/wp-admin', '/.git', '/.env']
+                for path in sensitive_paths:
+                    try:
+                        check_url = urllib.parse.urljoin(target, path)
+                        r = requests.head(check_url, allow_redirects=False)
+                        if r.status_code != 404:
+                            results['vulnerabilities'].append({
+                                'type': 'sensitive_path',
+                                'severity': 'high',
+                                'details': f'Potentially sensitive path accessible: {path}'
+                            })
+                    except:
+                        continue
+
+                # Check for forms without CSRF protection
+                forms = soup.find_all('form')
+                for form in forms:
+                    csrf_found = False
+                    for input_tag in form.find_all('input'):
+                        if input_tag.get('name', '').lower() in ['csrf', 'csrf_token', '_token']:
+                            csrf_found = True
+                            break
+                    if not csrf_found:
+                        results['vulnerabilities'].append({
+                            'type': 'csrf_vulnerability',
+                            'severity': 'medium',
+                            'details': f'Form found without CSRF protection: {form.get("action", "unknown")}'
+                        })
+            except Exception as e:
+                logging.error(f"Web application scan error: {str(e)}")
+
+            # Completion (100%)
+            yield 100
+            return results
         except Exception as e:
-            logging.error(f"Web application scan error: {str(e)}")
-
-        return results
+            logging.error(f"Full scan error: {str(e)}")
+            return {
+                'timestamp': datetime.now().isoformat(),
+                'target': target,
+                'scan_type': 'full',
+                'status': 'failed',
+                'error': str(e)
+            }
 
     def custom_scan(self, target, options):
         """Custom scan with user-defined options"""

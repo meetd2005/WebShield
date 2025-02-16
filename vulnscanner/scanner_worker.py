@@ -30,16 +30,26 @@ class ScanWorkerPool:
         """Execute the scan in a worker thread"""
         try:
             if scan_type == 'quick':
-                result = scanner.quick_scan(target)
+                scan_generator = scanner.quick_scan(target)
             elif scan_type == 'full':
-                result = scanner.full_scan(target)
+                scan_generator = scanner.full_scan(target)
             else:
-                result = scanner.custom_scan(target, options or {})
-            
-            # Update progress periodically
-            self.update_progress(scan_id, 100)
+                scan_generator = scanner.custom_scan(target, options or {})
+
+            # Process the scan generator to get progress updates
+            result = None
+            for progress in scan_generator:
+                if isinstance(progress, dict):  # Final result
+                    result = progress
+                    break
+                else:  # Progress update
+                    self.update_progress(scan_id, progress)
+
+            if result is None:  # If no result was returned
+                raise Exception("Scan failed to return results")
+
             return result
-            
+
         except Exception as e:
             logging.error(f"Scan {scan_id} failed: {str(e)}")
             raise
