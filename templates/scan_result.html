@@ -157,7 +157,10 @@
                                         <i class="fas fa-arrow-right me-2"></i>HTTP Request
                                     </h6>
                                     <div class="bg-dark p-3 rounded border border-secondary">
-                                        <pre class="mb-0"><code class="language-http">{{ report.get_request_details()|tojson(indent=2) }}</code></pre>
+                                        <pre class="mb-0"><code class="language-http">Method: {{ vuln.request_data.method }}
+URL: {{ vuln.request_data.url }}
+Headers: {{ vuln.request_data.headers|tojson(indent=2) }}
+Body: {{ vuln.request_data.body|tojson(indent=2) }}</code></pre>
                                     </div>
                                 </div>
 
@@ -167,7 +170,9 @@
                                         <i class="fas fa-arrow-left me-2"></i>HTTP Response
                                     </h6>
                                     <div class="bg-dark p-3 rounded border border-secondary">
-                                        <pre class="mb-0"><code class="language-http">{{ report.get_response_details()|tojson(indent=2) }}</code></pre>
+                                        <pre class="mb-0"><code class="language-http">Status Code: {{ vuln.response_data.status_code }}
+Headers: {{ vuln.response_data.headers|tojson(indent=2) }}
+Body: {{ vuln.response_data.body }}</code></pre>
                                     </div>
                                 </div>
 
