@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VulnScanner Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        .scan-item {
+            transition: all 0.3s ease;
+        }
+        .scan-item:hover {
+            transform: translateX(8px);
+        }
+        .gradient-bg {
+            background: linear-gradient(120deg, #1a1f2c, #2d3748);
+        }
+        .pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: .5;
+            }
+        }
+        .slide-in {
+            animation: slideIn 0.5s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-gray-100">
+    <!-- Header -->
+    <header class="gradient-bg border-b border-gray-700/50 shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-blue-500/10 p-2 rounded-lg">
+                        <i class="fas fa-shield-alt text-blue-500 text-2xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-blue-300">VulnScanner Pro</h1>
+                        <p class="text-sm text-gray-400">Security Analysis Tool</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button class="p-2 hover:bg-gray-700/50 rounded-lg transition-colors duration-200">
+                        <i class="fas fa-bell text-gray-400 hover:text-blue-400 transition-colors"></i>
+                    </button>
+                    <button class="p-2 hover:bg-gray-700/50 rounded-lg transition-colors duration-200">
+                        <i class="fas fa-cog text-gray-400 hover:text-blue-400 transition-colors"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-6 py-8">
+        <!-- Scan Section -->
+        <div class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 mb-8 shadow-xl border border-gray-700/50">
+            <h2 class="text-xl font-semibold mb-6 flex items-center">
+                <i class="fas fa-search text-blue-400 mr-3"></i>
+                New Security Scan
+            </h2>
+            <div class="flex gap-6 items-center">
+                <div class="space-x-4 flex items-center">
+                    <div class="relative group">
+                        <input type="text" id="urlInput" placeholder="Enter target URL to scan" 
+                               class="w-[850px] bg-gray-700/50 border border-gray-600/50 rounded-lg px-20 py-3 pl-10 
+                                      focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500
+                                      transition-all duration-200">
+                        <i class="fas fa-globe absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400
+                                 group-hover:text-blue-400 transition-colors"></i>
+                    </div>
+                </div>
+                <div class="space-x-4 flex items-center">
+                    <div class="relative group">
+                        <select id="scanType" 
+                                class="w-full bg-gray-700 border border-gray-600/50 rounded-lg px-4 py-3 pl-10
+                                       focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500
+                                       transition-all duration-200">
+                            <option value="quick">Quick Vulnerability Scan</option>
+                            <option value="full">Full Security Audit</option>
+                            <option value="custom">Custom Scan Configuration</option>
+                        </select>
+                        <i class="fas fa-list absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400
+                                 group-hover:text-blue-400 transition-colors"></i>
+                    </div>
+                </div>
+                <div>
+                    <button onclick="startScan()" 
+                            class="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-600
+                                   text-white font-semibold py-3 px-6 rounded-lg flex items-center justify-center
+                                   space-x-3 transform hover:scale-[1.02] transition-all duration-200 shadow-lg">
+                        <i class="fas fa-radar"></i>
+                        <span>Initiate Security Scan</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+                <!-- Previous Scans -->
+        <div class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-xl border border-gray-700/50">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-semibold flex items-center">
+                    <i class="fas fa-history text-blue-400 mr-3"></i>
+                    Scan History
+                </h2>
+                <div class="text-sm text-gray-400">
+                    <i class="fas fa-filter mr-2"></i>
+                    Filter Results
+                </div>
+            </div>
+            <div id="previousScans" class="space-y-4">
+                <!-- Scans will be inserted here by JavaScript -->
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const previousScans = [
+            { id: 1, url: 'https://example.com', type: 'Full Security Audit', vulnerabilities: 3, date: '2025-01-10', status: 'Complete', risk: 'High' },
+            { id: 2, url: 'https://test.org', type: 'Quick Vulnerability Scan', vulnerabilities: 1, date: '2025-01-09', status: 'Complete', risk: 'Low' },
+            { id: 3, url: 'https://demo.net', type: 'Custom Scan', vulnerabilities: 0, date: '2025-01-08', status: 'In Progress', risk: 'Unknown' }
+        ];
+
+        function getSeverityColor(count) {
+            if (count === 0) return 'text-green-400';
+            if (count < 2) return 'text-yellow-400';
+            return 'text-red-400';
+        }
+
+        function getSeverityIcon(count) {
+            if (count === 0) return 'fa-check-circle';
+            if (count < 2) return 'fa-exclamation-circle';
+            return 'fa-exclamation-triangle';
+        }
+
+        function getRiskBadgeColor(risk) {
+            const colors = {
+                'High': 'bg-red-500/10 text-red-400 border-red-500/20',
+                'Medium': 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+                'Low': 'bg-green-500/10 text-green-400 border-green-500/20',
+                'Unknown': 'bg-gray-500/10 text-gray-400 border-gray-500/20'
+            };
+            return colors[risk] || colors['Unknown'];
+        }
+
+        function renderPreviousScans() {
+            const container = document.getElementById('previousScans');
+            const fragment = document.createDocumentFragment();
+            
+            previousScans.forEach(scan => {
+                const scanItem = document.createElement('div');
+                scanItem.className = "scan-item bg-gray-700/30 rounded-lg p-4 hover:bg-gray-700/50 border border-gray-600/30 transition-all duration-200 cursor-pointer slide-in";
+                scanItem.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="bg-gray-600/50 p-3 rounded-lg">
+                                <i class="fas fa-chart-bar text-blue-400"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-medium flex items-center">
+                                    ${scan.url}
+                                    <span class="ml-3 text-xs px-2 py-1 rounded-full ${getRiskBadgeColor(scan.risk)} border">
+                                        ${scan.risk} Risk
+                                    </span>
+                                </h3>
+                                <div class="flex items-center space-x-2 text-sm text-gray-400 mt-1">
+                                    <span>${scan.type}</span>
+                                    <span>•</span>
+                                    <span>${scan.date}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-6">
+                            <div class="text-right">
+                                <div class="${getSeverityColor(scan.vulnerabilities)} font-medium flex items-center justify-end">
+                                    <i class="fas ${getSeverityIcon(scan.vulnerabilities)} mr-2"></i>
+                                    ${scan.vulnerabilities} vulnerabilities
+                                </div>
+                                <div class="text-sm text-gray-400 flex items-center justify-end mt-1">
+                                    <i class="fas ${scan.status === 'In Progress' ? 'fa-spinner fa-spin' : 'fa-check'} mr-2"></i>
+                                    ${scan.status}
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-500"></i>
+                        </div>
+                    </div>
+                `;
+                fragment.appendChild(scanItem);
+            });
+            
+            container.appendChild(fragment);
+        }
+
+        function startScan() {
+            const url = document.getElementById('urlInput').value;
+            const scanType = document.getElementById('scanType').value;
+            
+            if (!url) {
+                alert('Please enter a URL to scan');
+                return;
+            }
+
+            previousScans.unshift({
+                id: previousScans.length + 1,
+                url: url,
+                type: document.getElementById('scanType').options[document.getElementById('scanType').selectedIndex].text,
+                vulnerabilities: 0,
+                date: new Date().toISOString().split('T')[0],
+                status: 'In Progress',
+                risk: 'Unknown'
+            });
+
+            document.getElementById('urlInput').value = '';
+            renderPreviousScans();
+        }
+
+        // Initial render
+        renderPreviousScans();
+    </script>
+</body>
+</html>

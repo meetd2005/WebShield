@@ -1,0 +1,57 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vulnerability Scanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"></link>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #1a202c, #2d3748, #4a5568);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+    <header class="bg-gray-800 text-white fixed top-0 left-0 w-full z-10">
+        <div class="container mx-auto flex justify-between items-center p-5">
+            <h1 class="text-1/l md:text-xl font-bold">Vulnerability Scanner</h1>
+            <nav>
+                <ul class="flex space-x-4">
+                    <li><a href="#" class="hover:underline text-lg md:text-2.5xl">About Us</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-5 pt-24">
+        <section class="text-center my-10">
+            <h2 class="text-4xl md:text-5xl font-bold mb-5">Secure Your Applications with Ease</h2>
+            <p class="text-lg md:text-xl mb-5">Our vulnerability scanner helps you identify and fix security issues in your applications quickly and efficiently.</p><br>
+            <a href="{{ url_for('login') }}" class="bg-gray-700 text-white px-8 py-4 rounded-full text-lg md:text-xl font-bold hover:bg-blue-600 transition duration-300 relative overflow-hidden ripple-effect">Get Started</a>
+        </section>
+
+        <section class="my-10">
+            <h3 class="text-3xl md:text-4xl font-bold mb-5 text-center">Features</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div class="bg-gray-800 p-5 rounded-lg shadow-lg text-center">
+                    <i class="fas fa-shield-alt text-gray-400 text-5xl md:text-6xl mb-3"></i>
+                    <h4 class="text-2xl md:text-3xl font-bold mb-3">Real-time Scanning</h4>
+                    <p class="text-base md:text-lg">Get instant results with our real-time scanning feature, ensuring your applications are always secure.</p>
+                </div>
+                <div class="bg-gray-800 p-5 rounded-lg shadow-lg text-center">
+                    <i class="fas fa-bug text-gray-400 text-5xl md:text-6xl mb-3"></i>
+                    <h4 class="text-2xl md:text-3xl font-bold mb-3">Comprehensive Reports</h4>
+                    <p class="text-base md:text-lg">Receive detailed reports that help you understand and fix vulnerabilities effectively.</p>
+                </div>
+                <div class="bg-gray-800 p-5 rounded-lg shadow-lg text-center">
+                    <i class="fas fa-lock text-gray-400 text-5xl md:text-6xl mb-3"></i>
+                    <h4 class="text-2xl md:text-3xl font-bold mb-3">Advanced Security</h4>
+                    <p class="text-base md:text-lg">Utilize advanced security features to protect your applications from the latest threats.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

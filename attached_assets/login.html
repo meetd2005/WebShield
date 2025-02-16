@@ -1,0 +1,57 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1a202c, #2d3748, #4a5568);
+        }
+    </style>
+</head>
+
+<body class="flex items-center justify-center min-h-screen">
+    <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-sm">
+        <h1 class="text-2xl font-bold text-center text-white mb-2">Hello, Again!</h1>
+        <p class="text-center text-gray-400 mb-6">We are happy to have you back.</p>
+        <form method="POST" action="{{ url_for('login') }}">
+            {{ form.hidden_tag() }}
+            <div class="mb-4">
+                {{ form.username(class_="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white
+                focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300 relative overflow-hidden ripple-effect", placeholder="Username") }}
+                {% for error in form.username.errors %}
+                <p class="text-red-500 text-xs mt-1">{{ error }}</p>
+                {% endfor %}
+            </div>
+            <div class="mb-4 relative">
+                {{ form.password(class_="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white
+                focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300 relative overflow-hidden ripple-effect", placeholder="Password", id="password",
+                oncopy="return false;") }}
+                <i class="fas fa-eye absolute right-3 top-3 text-gray-400 cursor-pointer" id="togglePassword"></i>
+                {% if error %}
+                <p class="text-red-500 text-xs mt-1">{{ error }}</p>
+                {% endif %}
+            </div>
+            <div>
+                {{ form.submit(class_="w-full bg-gray-700 text-white py-2 rounded-lg hover:bg-blue-600
+                focus:outline-none focus:ring-2 transition duration-300 relative overflow-hidden ripple-effect") }}
+            </div>
+            <p class="text-center text-gray-400 mt-4">
+                <a href="{{ url_for('register') }}" class="hover:underline">Not have an account? Sign Up</a>
+            </p>
+    </div>
+    <script>
+        const togglePassword = document.querySelector('#togglePassword');
+        const password = document.querySelector('input[name="password"]');
+
+        togglePassword.addEventListener('click', function () {
+            const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+            password.setAttribute('type', type);
+            this.classList.toggle('fa-eye-slash');
+        });
+    </script>
+</body>
+
+</html>
