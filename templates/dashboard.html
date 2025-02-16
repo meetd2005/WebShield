@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %} - Dashboard{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="h2">Security Dashboard</h1>
+        </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newScanModal">
+                <i class="fas fa-plus me-2"></i>New Scan
+            </button>
+        </div>
+    </div>
+
+    <!-- Scan History -->
+    <div class="card bg-dark text-light border-secondary">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Recent Scans</h5>
+        </div>
+        <div class="card-body">
+            {% if scans %}
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover">
+                        <thead>
+                            <tr>
+                                <th>Target</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Started</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for scan in scans %}
+                            <tr>
+                                <td>{{ scan.target }}</td>
+                                <td>{{ scan.scan_type|title }}</td>
+                                <td>
+                                    {% if scan.status == 'completed' %}
+                                        <span class="badge bg-success">Completed</span>
+                                    {% elif scan.status == 'in_progress' %}
+                                        <span class="badge bg-info">In Progress</span>
+                                    {% elif scan.status == 'failed' %}
+                                        <span class="badge bg-danger">Failed</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ scan.status|title }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ scan.started_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    {% if scan.status == 'completed' %}
+                                        <a href="{{ url_for('view_report', report_id=scan.reports[0].id) }}" 
+                                           class="btn btn-sm btn-outline-info">
+                                            <i class="fas fa-file-alt"></i> View Report
+                                        </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted text-center my-4">No scans have been performed yet. Start a new scan to begin.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- New Scan Modal -->
+<div class="modal fade" id="newScanModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">New Security Scan</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="scanForm" action="{{ url_for('start_scan') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Target URL</label>
+                        <input type="url" class="form-control bg-dark text-light border-secondary" 
+                               name="target" required placeholder="https://example.com">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Scan Type</label>
+                        <select class="form-select bg-dark text-light border-secondary" name="scan_type">
+                            <option value="quick">Quick Scan</option>
+                            <option value="full">Full Scan</option>
+                            <option value="custom">Custom Scan</option>
+                        </select>
+                    </div>
+                    <div id="customOptions" class="d-none">
+                        <div class="mb-3">
+                            <label class="form-label">Custom Options</label>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="port_scan" value="true">
+                                <label class="form-check-label">Port Scan</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="ssl_check" value="true">
+                                <label class="form-check-label">SSL Certificate Check</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="header_check" value="true">
+                                <label class="form-check-label">Security Headers Check</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="crawl" value="true">
+                                <label class="form-check-label">Web Crawling</label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="scanForm" class="btn btn-primary">Start Scan</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.querySelector('select[name="scan_type"]').addEventListener('change', function() {
+    const customOptions = document.getElementById('customOptions');
+    if (this.value === 'custom') {
+        customOptions.classList.remove('d-none');
+    } else {
+        customOptions.classList.add('d-none');
+    }
+});
+
+// Validate target URL before form submission
+document.getElementById('scanForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const target = this.querySelector('input[name="target"]').value;
+    
+    try {
+        const response = await fetch("{{ url_for('validate_target') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ target: target })
+        });
+        
+        const data = await response.json();
+        
+        if (data.valid) {
+            this.submit();
+        } else {
+            alert('Invalid or inaccessible target URL. Please check the URL and try again.');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('An error occurred while validating the target URL.');
+    }
+});
+</script>
+{% endblock %}

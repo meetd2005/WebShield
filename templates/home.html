@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %} - Home{% endblock %}
+
+{% block content %}
+<main class="container mx-auto p-5 pt-24">
+    <section class="text-center my-10">
+        <h2 class="text-4xl md:text-5xl font-bold mb-5">Secure Your Applications with Ease</h2>
+        <p class="text-lg md:text-xl mb-5">Our vulnerability scanner helps you identify and fix security issues in your applications quickly and efficiently.</p><br>
+        <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">Get Started</a>
+    </section>
+
+    <section class="my-10">
+        <h3 class="text-3xl md:text-4xl font-bold mb-5 text-center">Features</h3>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card h-100 bg-dark text-light border-secondary">
+                    <div class="card-body text-center">
+                        <i class="fas fa-shield-alt text-primary fs-1 mb-3"></i>
+                        <h4 class="card-title">Real-time Scanning</h4>
+                        <p class="card-text">Get instant results with our real-time scanning feature, ensuring your applications are always secure.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 bg-dark text-light border-secondary">
+                    <div class="card-body text-center">
+                        <i class="fas fa-bug text-primary fs-1 mb-3"></i>
+                        <h4 class="card-title">Comprehensive Reports</h4>
+                        <p class="card-text">Receive detailed reports that help you understand and fix vulnerabilities effectively.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 bg-dark text-light border-secondary">
+                    <div class="card-body text-center">
+                        <i class="fas fa-lock text-primary fs-1 mb-3"></i>
+                        <h4 class="card-title">Advanced Security</h4>
+                        <p class="card-text">Utilize advanced security features to protect your applications from the latest threats.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+{% endblock %}
