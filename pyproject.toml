@@ -15,4 +15,6 @@ dependencies = [
     "python-nmap>=0.7.1",
     "beautifulsoup4>=4.13.3",
     "requests>=2.32.3",
+    "openai>=1.63.0",
+    "sqlalchemy>=2.0.38",
 ]

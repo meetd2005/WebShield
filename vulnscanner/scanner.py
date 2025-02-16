@@ -102,6 +102,100 @@ class SecurityScanner:
             logging.error(f"Headers check error: {str(e)}")
             return []
 
+    def check_web_vulnerabilities(self, url):
+        """Check for common web application vulnerabilities"""
+        try:
+            vulnerabilities = []
+
+            # Test for directory traversal
+            traversal_paths = ['../etc/passwd', '..\\windows\\win.ini', '....//....//etc/passwd']
+            for path in traversal_paths:
+                try:
+                    test_url = urllib.parse.urljoin(url, path)
+                    response = requests.get(test_url, allow_redirects=False, timeout=5)
+                    if response.status_code == 200 and any(signature in response.text for signature in ['root:x:', '[fonts]']):
+                        vulnerabilities.append({
+                            'type': 'directory_traversal',
+                            'severity': 'high',
+                            'details': f'Potential directory traversal vulnerability found at: {test_url}'
+                        })
+                except:
+                    continue
+
+            # Test for SQL injection
+            sql_payloads = ["' OR '1'='1", "1' OR '1' = '1"]
+            for payload in sql_payloads:
+                try:
+                    # Test URL parameters
+                    test_url = f"{url}?id={payload}"
+                    response = requests.get(test_url, timeout=5)
+                    if any(error in response.text.lower() for error in ['sql', 'mysql', 'sqlite', 'postgresql']):
+                        vulnerabilities.append({
+                            'type': 'sql_injection',
+                            'severity': 'high',
+                            'details': f'Potential SQL injection vulnerability detected at: {url}'
+                        })
+                except:
+                    continue
+
+            # Test for XSS vulnerabilities
+            xss_payloads = ['<script>alert(1)</script>', '"><script>alert(1)</script>', '<img src=x onerror=alert(1)>']
+            for payload in xss_payloads:
+                try:
+                    test_url = f"{url}?q={urllib.parse.quote(payload)}"
+                    response = requests.get(test_url, timeout=5)
+                    if payload in response.text:
+                        vulnerabilities.append({
+                            'type': 'xss',
+                            'severity': 'high',
+                            'details': f'Potential Cross-Site Scripting (XSS) vulnerability detected at: {url}'
+                        })
+                except:
+                    continue
+
+            # Enhanced security header checks
+            response = requests.get(url)
+            headers = response.headers
+            security_headers = {
+                'X-Frame-Options': 'Missing X-Frame-Options header (Clickjacking risk)',
+                'X-XSS-Protection': 'Missing X-XSS-Protection header',
+                'X-Content-Type-Options': 'Missing X-Content-Type-Options header',
+                'Strict-Transport-Security': 'Missing HSTS header',
+                'Content-Security-Policy': 'Missing Content-Security-Policy header',
+                'Referrer-Policy': 'Missing Referrer-Policy header',
+                'Permissions-Policy': 'Missing Permissions-Policy header'
+            }
+
+            for header, message in security_headers.items():
+                if header not in headers:
+                    vulnerabilities.append({
+                        'type': 'missing_security_header',
+                        'severity': 'medium',
+                        'details': message
+                    })
+
+            # Check for sensitive information exposure
+            sensitive_patterns = [
+                r'\b[\w\.-]+@[\w\.-]+\.\w+\b',  # Email addresses
+                r'\b\d{3}-\d{2}-\d{4}\b',       # SSN
+                r'\b\d{16}\b',                   # Credit card numbers
+                r'password\s*=\s*[\'"][^\'"]+[\'"]'  # Hard-coded passwords
+            ]
+
+            for pattern in sensitive_patterns:
+                matches = re.findall(pattern, response.text, re.IGNORECASE)
+                if matches:
+                    vulnerabilities.append({
+                        'type': 'information_disclosure',
+                        'severity': 'high',
+                        'details': f'Potential sensitive information disclosure detected: {pattern}'
+                    })
+
+            return vulnerabilities
+        except Exception as e:
+            logging.error(f"Web vulnerability check error: {str(e)}")
+            return []
+
     def quick_scan(self, target):
         """Enhanced quick security scan"""
         if not self.validate_url(target):
@@ -121,26 +215,9 @@ class SecurityScanner:
             'vulnerabilities': []
         }
 
-        # Basic port scan for common services
-        try:
-            hostname = urllib.parse.urlparse(target).netloc
-            self.nm.scan(hostname, arguments='-F -sV')
-            for host in self.nm.all_hosts():
-                for proto in self.nm[host].all_protocols():
-                    ports = self.nm[host][proto].keys()
-                    for port in ports:
-                        service = self.nm[host][proto][port]
-                        if port in [80, 443, 21, 22, 3306, 5432, 27017, 6379]:
-                            results['vulnerabilities'].append({
-                                'type': 'open_port',
-                                'severity': 'medium',
-                                'details': f'Port {port} ({service["name"]}) is open and potentially exposed'
-                            })
-        except Exception as e:
-            logging.error(f"Quick port scan error: {str(e)}")
-
-        # Add header security checks
+        # Basic security checks
         results['vulnerabilities'].extend(self.check_security_headers(target))
+        results['vulnerabilities'].extend(self.check_web_vulnerabilities(target))
 
         if target.startswith('https'):
             hostname = urllib.parse.urlparse(target).netloc
@@ -200,6 +277,7 @@ class SecurityScanner:
 
         # Add all security checks
         results['vulnerabilities'].extend(self.check_security_headers(target))
+        results['vulnerabilities'].extend(self.check_web_vulnerabilities(target))
 
         if target.startswith('https'):
             results['vulnerabilities'].extend(self.check_ssl_certificate(hostname))
