@@ -5,6 +5,7 @@ from vulnscanner.forms import RegisterForm, LoginForm
 from flask_login import login_required, login_user, logout_user, current_user
 from vulnscanner.scanner import SecurityScanner
 from vulnscanner.report_generator import ReportGenerator
+from vulnscanner.scanner_worker import scan_worker_pool
 from datetime import datetime
 import json
 import logging
@@ -52,50 +53,90 @@ def start_scan():
     db.session.add(scan)
     db.session.commit()
 
+    # Submit scan to worker pool
     try:
-        # Perform scan based on type
-        if scan_type == 'quick':
-            results = scanner.quick_scan(target)
-        elif scan_type == 'full':
-            results = scanner.full_scan(target)
-        else:
-            config = json.loads(request.form.get('config', '{}'))
-            results = scanner.custom_scan(target, config)
-
-        # Generate severity summary
-        severity_summary = {
-            'high': 0,
-            'medium': 0,
-            'low': 0,
-            'info': 0
-        }
-        for vuln in results['vulnerabilities']:
-            severity = vuln.get('severity', 'info').lower()
-            if severity in severity_summary:
-                severity_summary[severity] += 1
-
-        # Create report
-        report = Report(
-            scan_id=scan.id,
-            summary=severity_summary,
-            vulnerabilities=results['vulnerabilities'],
-            created_at=datetime.utcnow()
-        )
-        db.session.add(report)
-
-        # Update scan status
-        scan.status = "completed"
-        scan.completed_at = datetime.utcnow()
-        db.session.commit()
-
-        return redirect(url_for('view_report', report_id=report.id))
-
+        config = json.loads(request.form.get('config', '{}'))
+        scan_worker_pool.submit_scan(scan.id, scanner, scan_type, target, config)
+        return redirect(url_for('view_scan', scan_id=scan.id))
     except Exception as e:
-        logging.error(f"Scan error: {str(e)}")
+        logging.error(f"Failed to start scan: {str(e)}")
         scan.status = "failed"
-        scan.completed_at = datetime.utcnow()
         db.session.commit()
         return jsonify({"error": str(e)}), 500
+
+@app.route("/scan/<int:scan_id>")
+@login_required
+def view_scan(scan_id):
+    scan = Scan.query.get_or_404(scan_id)
+    if scan.user_id != current_user.id:
+        return "Unauthorized", 403
+
+    # If scan is completed, redirect to the report view
+    if scan.status == "completed" and scan.reports:
+        return redirect(url_for('view_report', report_id=scan.reports[0].id))
+
+    return render_template('scan_progress.html', scan=scan)
+
+@app.route("/api/scan/status/<int:scan_id>")
+@login_required
+def scan_status(scan_id):
+    """Get the current status of a scan"""
+    scan = Scan.query.get_or_404(scan_id)
+    if scan.user_id != current_user.id:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    status = scan_worker_pool.get_scan_status(scan.id)
+
+    # Update scan status in database if needed
+    if status["status"] != scan.status:
+        scan.status = status["status"]
+        if status["status"] == "completed":
+            scan.completed_at = datetime.utcnow()
+
+            # Get the scan results
+            future = scan_worker_pool.active_scans.get(scan.id)
+            if future and future.done():
+                results = future.result()
+
+                # Create report
+                severity_summary = {
+                    'high': 0,
+                    'medium': 0,
+                    'low': 0,
+                    'info': 0
+                }
+                for vuln in results['vulnerabilities']:
+                    severity = vuln.get('severity', 'info').lower()
+                    if severity in severity_summary:
+                        severity_summary[severity] += 1
+
+                report = Report(
+                    scan_id=scan.id,
+                    summary=severity_summary,
+                    vulnerabilities=results['vulnerabilities'],
+                    created_at=datetime.utcnow()
+                )
+                db.session.add(report)
+
+        db.session.commit()
+
+    return jsonify(status)
+
+@app.route("/api/scan/cancel/<int:scan_id>", methods=['POST'])
+@login_required
+def cancel_scan(scan_id):
+    """Cancel a running scan"""
+    scan = Scan.query.get_or_404(scan_id)
+    if scan.user_id != current_user.id:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    if scan_worker_pool.cancel_scan(scan.id):
+        scan.status = "cancelled"
+        scan.completed_at = datetime.utcnow()
+        db.session.commit()
+        return jsonify({"status": "cancelled"})
+
+    return jsonify({"error": "Could not cancel scan"}), 400
 
 @app.route("/report/<int:report_id>")
 @login_required
@@ -108,19 +149,6 @@ def view_report(report_id):
 
     return render_template('scan_result.html', report=report, scan=scan)
 
-@app.route("/api/scan/status/<int:scan_id>")
-@login_required
-def scan_status(scan_id):
-    """Get the current status of a scan"""
-    scan = Scan.query.get_or_404(scan_id)
-    if scan.user_id != current_user.id:
-        return jsonify({"error": "Unauthorized"}), 403
-
-    return jsonify({
-        "status": scan.status,
-        "started_at": scan.started_at.isoformat() if scan.started_at else None,
-        "completed_at": scan.completed_at.isoformat() if scan.completed_at else None
-    })
 
 @app.route("/report/export/<int:report_id>")
 @login_required
