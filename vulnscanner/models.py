@@ -2,6 +2,7 @@ from app import db
 from flask_login import UserMixin
 from datetime import datetime
 import bcrypt
+import json
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -37,6 +38,9 @@ class Report(db.Model):
     vulnerabilities = db.Column(db.JSON, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     report_format = db.Column(db.String(20), default='html')
+    request_details = db.Column(db.JSON)  # Store HTTP request details
+    response_details = db.Column(db.JSON)  # Store HTTP response details
+    ai_analysis = db.Column(db.JSON)  # Store AI-generated analysis
 
     def get_severity_counts(self):
         counts = {'high': 0, 'medium': 0, 'low': 0, 'info': 0}
@@ -45,3 +49,12 @@ class Report(db.Model):
             if severity in counts:
                 counts[severity] += 1
         return counts
+
+    def get_request_details(self):
+        return self.request_details if self.request_details else {}
+
+    def get_response_details(self):
+        return self.response_details if self.response_details else {}
+
+    def get_ai_analysis(self):
+        return self.ai_analysis if self.ai_analysis else {}
