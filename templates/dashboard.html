@@ -15,6 +15,42 @@
         </div>
     </div>
 
+    <!-- Scan Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-dark text-light border-secondary">
+                <div class="card-body text-center">
+                    <h5 class="mb-0">Total Scans</h5>
+                    <h2 class="mt-2">{{ scans|length }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-dark text-light border-secondary">
+                <div class="card-body text-center">
+                    <h5 class="mb-0">In Progress</h5>
+                    <h2 class="mt-2">{{ scans|selectattr('status', 'equalto', 'in_progress')|list|length }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-dark text-light border-secondary">
+                <div class="card-body text-center">
+                    <h5 class="mb-0">Completed</h5>
+                    <h2 class="mt-2">{{ scans|selectattr('status', 'equalto', 'completed')|list|length }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-dark text-light border-secondary">
+                <div class="card-body text-center">
+                    <h5 class="mb-0">Failed</h5>
+                    <h2 class="mt-2">{{ scans|selectattr('status', 'equalto', 'failed')|list|length }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scan History -->
     <div class="card bg-dark text-light border-secondary">
         <div class="card-header">
@@ -35,14 +71,17 @@
                         </thead>
                         <tbody>
                             {% for scan in scans %}
-                            <tr>
+                            <tr class="align-middle">
                                 <td>{{ scan.target }}</td>
                                 <td>{{ scan.scan_type|title }}</td>
                                 <td>
                                     {% if scan.status == 'completed' %}
                                         <span class="badge bg-success">Completed</span>
                                     {% elif scan.status == 'in_progress' %}
-                                        <span class="badge bg-info">In Progress</span>
+                                        <span class="badge bg-info">
+                                            <span class="spinner-border spinner-border-sm me-1"></span>
+                                            In Progress
+                                        </span>
                                     {% elif scan.status == 'failed' %}
                                         <span class="badge bg-danger">Failed</span>
                                     {% else %}
@@ -51,11 +90,29 @@
                                 </td>
                                 <td>{{ scan.started_at.strftime('%Y-%m-%d %H:%M') }}</td>
                                 <td>
-                                    {% if scan.status == 'completed' %}
+                                    {% if scan.status == 'completed' and scan.reports %}
                                         <a href="{{ url_for('view_report', report_id=scan.reports[0].id) }}" 
-                                           class="btn btn-sm btn-outline-info">
+                                           class="btn btn-sm btn-outline-info me-2">
                                             <i class="fas fa-file-alt"></i> View Report
                                         </a>
+                                        <div class="dropdown d-inline">
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" 
+                                                    type="button" data-bs-toggle="dropdown">
+                                                <i class="fas fa-download"></i> Export
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-dark">
+                                                <li>
+                                                    <a class="dropdown-item" href="{{ url_for('export_report', report_id=scan.reports[0].id, format='html') }}">
+                                                        <i class="fas fa-file-code me-2"></i>HTML
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item" href="{{ url_for('export_report', report_id=scan.reports[0].id, format='json') }}">
+                                                        <i class="fas fa-file-code me-2"></i>JSON
+                                                    </a>
+                                                </li>
+                                            </ul>
+                                        </div>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -138,7 +195,7 @@ document.querySelector('select[name="scan_type"]').addEventListener('change', fu
 document.getElementById('scanForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const target = this.querySelector('input[name="target"]').value;
-    
+
     try {
         const response = await fetch("{{ url_for('validate_target') }}", {
             method: 'POST',
@@ -147,9 +204,9 @@ document.getElementById('scanForm').addEventListener('submit', async function(e)
             },
             body: JSON.stringify({ target: target })
         });
-        
+
         const data = await response.json();
-        
+
         if (data.valid) {
             this.submit();
         } else {

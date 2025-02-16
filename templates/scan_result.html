@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %} - Scan Report{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Scan Status Bar -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2 mb-0">Vulnerability Scan Report</h1>
+        <div class="d-flex align-items-center">
+            <span class="badge bg-{{ 'success' if scan.status == 'completed' else 'info' if scan.status == 'in_progress' else 'danger' }} me-2">
+                {{ scan.status|title }}
+            </span>
+            {% if scan.status == 'completed' %}
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-download me-2"></i>Export
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{{ url_for('export_report', report_id=report.id, format='html') }}">HTML</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('export_report', report_id=report.id, format='json') }}">JSON</a></li>
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Progress Bar for In-Progress Scans -->
+    {% if scan.status == 'in_progress' %}
+    <div class="card bg-dark text-light border-secondary mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between mb-2">
+                <span>Scan Progress</span>
+                <span class="scan-progress-text">0%</span>
+            </div>
+            <div class="progress bg-secondary">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                     role="progressbar" style="width: 0%" 
+                     aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <small class="text-muted mt-2 d-block scan-status-message">Initializing scan...</small>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Scan Details -->
+    <div class="card bg-dark text-light border-secondary mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="mb-2"><strong>Target:</strong> {{ scan.target }}</p>
+                    <p class="mb-2"><strong>Scan Type:</strong> {{ scan.scan_type|title }}</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="mb-2"><strong>Started:</strong> {{ scan.started_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                    {% if scan.completed_at %}
+                    <p class="mb-2"><strong>Completed:</strong> {{ scan.completed_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Real-time Vulnerability Summary -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <h6 class="card-title mb-2">High Risk</h6>
+                    <h2 class="mb-0 high-risk-count">{{ report.get_severity_counts()['high'] }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body text-center">
+                    <h6 class="card-title mb-2">Medium Risk</h6>
+                    <h2 class="mb-0 medium-risk-count">{{ report.get_severity_counts()['medium'] }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h6 class="card-title mb-2">Low Risk</h6>
+                    <h2 class="mb-0 low-risk-count">{{ report.get_severity_counts()['low'] }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-secondary text-white">
+                <div class="card-body text-center">
+                    <h6 class="card-title mb-2">Info</h6>
+                    <h2 class="mb-0 info-count">{{ report.get_severity_counts()['info'] }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Real-time Vulnerabilities List -->
+    <div class="card bg-dark text-light border-secondary">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Detected Vulnerabilities</h5>
+            {% if scan.status == 'in_progress' %}
+            <div class="spinner-border spinner-border-sm text-info" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <div class="accordion" id="vulnAccordion">
+                {% if report.vulnerabilities %}
+                    {% for vuln in report.vulnerabilities %}
+                    <div class="accordion-item bg-dark border-secondary">
+                        <h2 class="accordion-header" id="heading{{ loop.index }}">
+                            <button class="accordion-button bg-dark text-light collapsed" type="button" 
+                                    data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}">
+                                <div class="d-flex align-items-center w-100">
+                                    <span class="badge bg-{{ vuln.severity|lower }} me-2">{{ vuln.severity|upper }}</span>
+                                    {{ vuln.type|replace('_', ' ')|title }}
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="collapse{{ loop.index }}" class="accordion-collapse collapse" 
+                             data-bs-parent="#vulnAccordion">
+                            <div class="accordion-body">
+                                <p class="mb-2">{{ vuln.details }}</p>
+                                {% if vuln.get('recommendation') %}
+                                <p class="mb-0"><strong>Recommendation:</strong> {{ vuln.recommendation }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted text-center my-4">No vulnerabilities detected yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Real-time Update Script -->
+{% if scan.status == 'in_progress' %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const progressBar = document.querySelector('.progress-bar');
+    const progressText = document.querySelector('.scan-progress-text');
+    const statusMessage = document.querySelector('.scan-status-message');
+    let progress = 0;
+
+    const updateProgress = () => {
+        if (progress < 90) {
+            progress += Math.random() * 10;
+            progress = Math.min(progress, 90);
+            progressBar.style.width = `${progress}%`;
+            progressBar.setAttribute('aria-valuenow', progress);
+            progressText.textContent = `${Math.round(progress)}%`;
+        }
+    };
+
+    const checkStatus = async () => {
+        try {
+            const response = await fetch("{{ url_for('scan_status', scan_id=scan.id) }}");
+            const data = await response.json();
+
+            if (data.status === 'completed') {
+                progressBar.style.width = '100%';
+                progressBar.setAttribute('aria-valuenow', 100);
+                progressText.textContent = '100%';
+                window.location.reload();
+                return;
+            } else if (data.status === 'failed') {
+                statusMessage.textContent = 'Scan failed. Please try again.';
+                progressBar.classList.remove('bg-info');
+                progressBar.classList.add('bg-danger');
+                return;
+            }
+
+            updateProgress();
+            setTimeout(checkStatus, 2000);
+        } catch (error) {
+            console.error('Error checking scan status:', error);
+            statusMessage.textContent = 'Error updating scan status';
+        }
+    };
+
+    // Start progress updates
+    checkStatus();
+});
+</script>
+{% endif %}
+{% endblock %}
