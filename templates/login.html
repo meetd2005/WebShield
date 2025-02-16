@@ -4,20 +4,20 @@
 
 {% block content %}
 <div class="container d-flex align-items-center justify-content-center min-vh-100">
-    <div class="card bg-dark text-light border-secondary" style="max-width: 450px; width: 100%;">
-        <div class="card-body p-4">
-            <h1 class="card-title text-center h2 mb-4">Hello, Again!</h1>
-            <p class="text-center text-muted mb-4">We are happy to have you back.</p>
+    <div class="card bg-dark text-light border-secondary" style="max-width: 350px; width: 80%;">
+        <div class="card-body p-3">
+            <h1 class="card-title text-center h3 mb-3">Hello, Again!</h1>
+            <p class="text-center text-muted mb-3">We are happy to have you back.</p>
             <form method="POST" action="{{ url_for('login') }}">
                 {{ form.hidden_tag() }}
-                <div class="mb-4">
-                    {{ form.username(class="form-control form-control-lg bg-dark text-light border-secondary", placeholder="Username") }}
+                <div class="mb-3">
+                    {{ form.username(class="form-control bg-dark text-light border-secondary", placeholder="Username") }}
                     {% for error in form.username.errors %}
                     <div class="text-danger small mt-2">{{ error }}</div>
                     {% endfor %}
                 </div>
-                <div class="mb-4 position-relative">
-                    {{ form.password(class="form-control form-control-lg bg-dark text-light border-secondary", placeholder="Password", id="password") }}
+                <div class="mb-3 position-relative">
+                    {{ form.password(class="form-control bg-dark text-light border-secondary", placeholder="Password", id="password") }}
                     <i class="fas fa-eye position-absolute end-0 top-50 translate-middle-y me-3 text-muted" 
                        style="cursor: pointer;" id="togglePassword"></i>
                     {% for error in form.password.errors %}
@@ -28,10 +28,10 @@
                 <div class="alert alert-danger">{{ error }}</div>
                 {% endif %}
                 <div class="d-grid gap-2">
-                    {{ form.submit(class="btn btn-primary btn-lg") }}
+                    {{ form.submit(class="btn btn-primary") }}
                 </div>
             </form>
-            <p class="text-center mt-4">
+            <p class="text-center mt-3">
                 <a href="{{ url_for('register') }}" class="text-muted text-decoration-none">Not have an account? Sign Up</a>
             </p>
         </div>
