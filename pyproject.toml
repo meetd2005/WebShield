@@ -18,4 +18,5 @@ dependencies = [
     "openai>=1.63.0",
     "sqlalchemy>=2.0.38",
     "oauthlib>=3.2.2",
+    "trafilatura>=2.0.0",
 ]

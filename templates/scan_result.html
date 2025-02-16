@@ -242,6 +242,64 @@ Body: {% if response_data.get('body') %}{{ response_data.get('body') | tojson(in
             </div>
         </div>
     </div>
+
+    <!-- Add Threat Intelligence Section -->
+    {% set threat_intel = report.get_threat_intel() %}
+    {% if threat_intel %}
+    <div class="mb-4">
+        <h6 class="text-info mb-3">
+            <i class="fas fa-shield-virus me-2"></i>Threat Intelligence
+        </h6>
+        <div class="card bg-dark border-secondary">
+            <div class="card-body">
+                <!-- CVE Information -->
+                {% for threat in threat_intel %}
+                {% if threat.type == 'cve' %}
+                <div class="mb-3">
+                    <h6 class="text-warning mb-2">
+                        <i class="fas fa-bug me-2"></i>CVE Information
+                    </h6>
+                    <div class="ps-3">
+                        <p class="mb-1"><strong>ID:</strong> {{ threat.cve_id }}</p>
+                        <p class="mb-1"><strong>Title:</strong> {{ threat.title }}</p>
+                        <p class="mb-1"><strong>Severity:</strong> 
+                            <span class="badge bg-{{ 'danger' if threat.severity == 'HIGH' 
+                                else 'warning' if threat.severity == 'MEDIUM'
+                                else 'info' }}">
+                                {{ threat.severity }}
+                            </span>
+                        </p>
+                        <p class="mb-1"><strong>CVSS Score:</strong> {{ threat.cvss_score }}</p>
+                        <p class="mb-1"><strong>Published:</strong> {{ threat.published_date }}</p>
+                        <p class="mb-2"><strong>Description:</strong> {{ threat.description }}</p>
+                        {% if threat.mitigations %}
+                        <p class="mb-1"><strong>Mitigations:</strong></p>
+                        <p class="mb-0">{{ threat.mitigations }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if threat.type == 'indicator' %}
+                <div class="mb-3">
+                    <h6 class="text-danger mb-2">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Threat Indicator
+                    </h6>
+                    <div class="ps-3">
+                        <p class="mb-1"><strong>Type:</strong> {{ threat.indicator_type }}</p>
+                        <p class="mb-1"><strong>Value:</strong> {{ threat.value }}</p>
+                        <p class="mb-1"><strong>Threat Type:</strong> {{ threat.threat_type }}</p>
+                        <p class="mb-1"><strong>Confidence:</strong> {{ "%.1f"|format(threat.confidence_score * 100) }}%</p>
+                        <p class="mb-1"><strong>First Seen:</strong> {{ threat.first_seen }}</p>
+                        <p class="mb-0"><strong>Last Seen:</strong> {{ threat.last_seen }}</p>
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Add Prism.js for syntax highlighting -->
