@@ -1,28 +1,107 @@
+import logging
+from datetime import datetime
+import json
+import time
+
+from flask import Response, render_template, request, redirect, url_for, jsonify, stream_with_context
+from flask_login import login_required, login_user, logout_user, current_user
+
 from vulnscanner import app, db
-from flask import render_template, request, redirect, url_for, jsonify
 from vulnscanner.models import Report, User, Scan
 from vulnscanner.forms import RegisterForm, LoginForm
-from flask_login import login_required, login_user, logout_user, current_user
 from vulnscanner.scanner import SecurityScanner
 from vulnscanner.report_generator import ReportGenerator
 from vulnscanner.scanner_worker import scan_worker_pool
-from datetime import datetime
-import json
-import logging
 
-scanner = SecurityScanner()
-report_generator = ReportGenerator()
+# Configure route logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+try:
+    # Initialize scanner and report generator
+    scanner = SecurityScanner()
+    report_generator = ReportGenerator()
+    logger.info("Successfully initialized SecurityScanner and ReportGenerator")
+except Exception as e:
+    logger.error(f"Failed to initialize SecurityScanner: {str(e)}")
+    raise
+
+@app.route("/dashboard", methods=['GET', 'POST'])
+@login_required
+def dashboard():
+    try:
+        logger.debug(f"Loading dashboard for user {current_user.username}")
+
+        # Get user's scans with their associated reports
+        user_scans = (
+            Scan.query
+            .filter_by(user_id=current_user.id)
+            .order_by(Scan.started_at.desc())
+            .all()
+        )
+        logger.debug(f"Found {len(user_scans)} scans for user")
+
+        # Ensure scan statuses are up-to-date
+        for scan in user_scans:
+            try:
+                if scan.status == 'in_progress':
+                    logger.debug(f"Checking status for scan {scan.id}")
+                    status = scan_worker_pool.get_scan_status(scan.id)
+
+                    if status['status'] != scan.status:
+                        logger.info(f"Updating scan {scan.id} status from {scan.status} to {status['status']}")
+                        scan.status = status['status']
+
+                        if status['status'] == 'completed':
+                            scan.completed_at = datetime.utcnow()
+                            # Create report if one doesn't exist
+                            if not scan.reports:
+                                try:
+                                    future = scan_worker_pool.active_scans.get(scan.id)
+                                    if future and future.done():
+                                        results = future.result()
+                                        if results and 'vulnerabilities' in results:
+                                            logger.info(f"Creating report for completed scan {scan.id}")
+                                            report = Report(
+                                                scan_id=scan.id,
+                                                summary={
+                                                    'high': sum(1 for v in results['vulnerabilities'] if v['severity'].lower() == 'high'),
+                                                    'medium': sum(1 for v in results['vulnerabilities'] if v['severity'].lower() == 'medium'),
+                                                    'low': sum(1 for v in results['vulnerabilities'] if v['severity'].lower() == 'low'),
+                                                    'info': sum(1 for v in results['vulnerabilities'] if v['severity'].lower() == 'info')
+                                                },
+                                                vulnerabilities=results['vulnerabilities'],
+                                                created_at=datetime.utcnow()
+                                            )
+                                            db.session.add(report)
+                                            logger.info(f"Report created successfully for scan {scan.id}")
+                                except Exception as e:
+                                    logger.error(f"Failed to create report for scan {scan.id}: {str(e)}")
+                                    scan.error = str(e)
+                                    scan.status = 'failed'
+                        elif status['status'] == 'failed':
+                            scan.error = status.get('error', 'Unknown error occurred')
+
+                        db.session.commit()
+            except Exception as e:
+                logger.error(f"Error updating scan {scan.id}: {str(e)}")
+                continue
+
+        return render_template('dashboard.html', scans=user_scans)
+    except Exception as e:
+        logger.error(f"Error in dashboard route: {str(e)}", exc_info=True)
+        return render_template('dashboard.html', scans=[], error="Failed to load dashboard")
+
+@app.route("/ping")
+def ping():
+    """Simple endpoint to verify server is running"""
+    return "pong"
 
 @app.route("/")
 @app.route("/home")
 def home():
     return render_template('home.html')
 
-@app.route("/dashboard", methods=['GET', 'POST'])
-@login_required
-def dashboard():
-    user_scans = Scan.query.filter_by(user_id=current_user.id).order_by(Scan.started_at.desc()).all()
-    return render_template('dashboard.html', scans=user_scans)
 
 @app.route("/api/scan/validate", methods=['POST'])
 @login_required
@@ -67,15 +146,41 @@ def start_scan():
 @app.route("/scan/<int:scan_id>")
 @login_required
 def view_scan(scan_id):
+    logger.debug(f"Viewing scan {scan_id}")
     scan = Scan.query.get_or_404(scan_id)
+
     if scan.user_id != current_user.id:
         return "Unauthorized", 403
 
-    # If scan is completed, redirect to the report view
+    # Get current scan status and update if needed
+    status = scan_worker_pool.get_scan_status(scan.id)
+    if status['status'] != scan.status:
+        scan.status = status['status']
+        if status['status'] == 'completed':
+            scan.completed_at = datetime.utcnow()
+            # Get scan results and create report if not exists
+            scan_result = scan_worker_pool.get_scan_result(scan.id)
+            if scan_result and not scan.reports:
+                report = Report(
+                    scan_id=scan.id,
+                    summary={
+                        'high': sum(1 for v in scan_result['vulnerabilities'] if v['severity'].lower() == 'high'),
+                        'medium': sum(1 for v in scan_result['vulnerabilities'] if v['severity'].lower() == 'medium'),
+                        'low': sum(1 for v in scan_result['vulnerabilities'] if v['severity'].lower() == 'low'),
+                        'info': sum(1 for v in scan_result['vulnerabilities'] if v['severity'].lower() == 'info')
+                    },
+                    vulnerabilities=scan_result['vulnerabilities'],
+                    created_at=datetime.utcnow()
+                )
+                db.session.add(report)
+                db.session.commit()
+                logger.info(f"Report created successfully for scan {scan_id}")
+
+    # If scan is completed and has a report, redirect to report view
     if scan.status == "completed" and scan.reports:
         return redirect(url_for('view_report', report_id=scan.reports[0].id))
 
-    return render_template('scan_progress.html', scan=scan)
+    return render_template('scan_result.html', scan=scan)
 
 @app.route("/api/scan/status/<int:scan_id>")
 @login_required
@@ -93,30 +198,30 @@ def scan_status(scan_id):
         if status["status"] == "completed":
             scan.completed_at = datetime.utcnow()
 
-            # Get the scan results
-            future = scan_worker_pool.active_scans.get(scan.id)
-            if future and future.done():
-                results = future.result()
-
-                # Create report
-                severity_summary = {
-                    'high': 0,
-                    'medium': 0,
-                    'low': 0,
-                    'info': 0
-                }
-                for vuln in results['vulnerabilities']:
-                    severity = vuln.get('severity', 'info').lower()
-                    if severity in severity_summary:
-                        severity_summary[severity] += 1
-
-                report = Report(
-                    scan_id=scan.id,
-                    summary=severity_summary,
-                    vulnerabilities=results['vulnerabilities'],
-                    created_at=datetime.utcnow()
-                )
-                db.session.add(report)
+            # Get scan results and create report if not exists
+            scan_result = scan_worker_pool.get_scan_result(scan.id)
+            if scan_result and not scan.reports:
+                try:
+                    report = Report(
+                        scan_id=scan.id,
+                        summary={
+                            'high': sum(1 for v in scan_result['vulnerabilities'] if v['severity'].lower() == 'high'),
+                            'medium': sum(1 for v in scan_result['vulnerabilities'] if v['severity'].lower() == 'medium'),
+                            'low': sum(1 for v in scan_result['vulnerabilities'] if v['severity'].lower() == 'low'),
+                            'info': sum(1 for v in scan_result['vulnerabilities'] if v['severity'].lower() == 'info')
+                        },
+                        vulnerabilities=scan_result['vulnerabilities'],
+                        created_at=datetime.utcnow()
+                    )
+                    db.session.add(report)
+                    db.session.commit()
+                    logger.info(f"Report created successfully for scan {scan_id}")
+                except Exception as e:
+                    logger.error(f"Failed to create report for scan {scan_id}: {str(e)}")
+                    return jsonify({"status": "failed", "error": str(e)})
+            elif not scan_result:
+                logger.error(f"No scan results found for completed scan {scan_id}")
+                return jsonify({"status": "failed", "error": "No scan results found"})
 
         db.session.commit()
 
@@ -141,44 +246,76 @@ def cancel_scan(scan_id):
 @app.route("/report/<int:report_id>")
 @login_required
 def view_report(report_id):
+    """View a specific scan report"""
+    logger.debug(f"Viewing report {report_id}")
     report = Report.query.get_or_404(report_id)
     scan = Scan.query.get(report.scan_id)
 
     if scan.user_id != current_user.id:
         return "Unauthorized", 403
 
-    return render_template('scan_result.html', report=report, scan=scan)
+    # Format vulnerabilities with request/response details
+    formatted_vulnerabilities = []
+    for vuln in report.vulnerabilities:
+        formatted_vuln = {
+            'type': vuln.get('type', 'Unknown'),
+            'severity': vuln.get('severity', 'info'),
+            'details': vuln.get('details', 'No details available')
+        }
 
+        # Add request/response if available
+        if 'request_data' in vuln:
+            formatted_vuln['request'] = {
+                'method': vuln['request_data'].get('method', 'GET'),
+                'url': vuln['request_data'].get('url', ''),
+                'headers': vuln['request_data'].get('headers', {})
+            }
+        if 'response_data' in vuln:
+            formatted_vuln['response'] = {
+                'status_code': vuln['response_data'].get('status_code', 0),
+                'headers': vuln['response_data'].get('headers', {})
+            }
+
+        formatted_vulnerabilities.append(formatted_vuln)
+
+    # Pass both report and formatted data to template
+    return render_template(
+        'scan_result.html',
+        scan=scan,
+        report={
+            'id': report.id,
+            'summary': report.summary,
+            'vulnerabilities': formatted_vulnerabilities,
+            'created_at': report.created_at
+        }
+    )
 
 @app.route("/report/export/<int:report_id>")
 @login_required
 def export_report(report_id):
+    """Export report in various formats"""
     report = Report.query.get_or_404(report_id)
     scan = Scan.query.get(report.scan_id)
 
     if scan.user_id != current_user.id:
         return "Unauthorized", 403
 
-    format = request.args.get('format', 'html')
+    # Create report data
+    report_data = {
+        'target': scan.target,
+        'scan_type': scan.scan_type,
+        'timestamp': scan.completed_at.isoformat() if scan.completed_at else scan.started_at.isoformat(),
+        'vulnerabilities': report.vulnerabilities,
+        'summary': report.summary
+    }
 
-    if format == 'json':
-        return jsonify({
-            'scan': {
-                'target': scan.target,
-                'type': scan.scan_type,
-                'started_at': scan.started_at.isoformat(),
-                'completed_at': scan.completed_at.isoformat() if scan.completed_at else None
-            },
-            'summary': report.summary,
-            'vulnerabilities': report.vulnerabilities
-        })
-    else:
-        return report_generator.generate_html_report({
-            'target': scan.target,
-            'scan_type': scan.scan_type,
-            'timestamp': scan.started_at.isoformat(),
-            'vulnerabilities': report.vulnerabilities
-        })
+    format = request.args.get('format', 'html')
+    if format == 'pdf':
+        return report_generator.generate_pdf_report(report_data)
+    elif format == 'json':
+        return jsonify(report_generator.export_json(report_data))
+    else:  # html format
+        return jsonify(report_generator.generate_html_report(report_data))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -311,3 +448,75 @@ def test_scan_report():
     db.session.commit()
 
     return redirect(url_for('view_report', report_id=report.id))
+
+@app.route("/scan/events/<int:scan_id>")
+@login_required
+def scan_events(scan_id):
+    """SSE endpoint for real-time scan updates"""
+    def event_stream():
+        last_event_id = 0
+        retry_count = 0
+        max_retries = 30  # 30 seconds timeout
+        logging.debug(f"Starting event stream for scan {scan_id}")
+
+        while True:
+            # Check scan status first
+            status = scan_worker_pool.get_scan_status(scan_id)
+
+            # If scan is in a final state, update database and close stream
+            if status['status'] in ['completed', 'failed', 'cancelled']:
+                scan = Scan.query.get(scan_id)
+                if scan and scan.status != status['status']:
+                    scan.status = status['status']
+                    if status['status'] == 'completed':
+                        scan.completed_at = datetime.utcnow()
+                        # Create report for completed scan
+                        future = scan_worker_pool.active_scans.get(scan_id)
+                        if future and future.done():
+                            try:
+                                results = future.result()
+                                report = Report(
+                                    scan_id=scan.id,
+                                    summary={
+                                        'high': sum(1 for v in results['vulnerabilities'] if v['severity'].lower() == 'high'),
+                                        'medium': sum(1 for v in results['vulnerabilities'] if v['severity'].lower() == 'medium'),
+                                        'low': sum(1 for v in results['vulnerabilities'] if v['severity'].lower() == 'low'),
+                                        'info': sum(1 for v in results['vulnerabilities'] if v['severity'].lower() == 'info')
+                                    },
+                                    vulnerabilities=results['vulnerabilities'],
+                                    created_at=datetime.utcnow()
+                                )
+                                db.session.add(report)
+                            except Exception as e:
+                                logging.error(f"Failed to create report for scan {scan_id}: {str(e)}")
+                    db.session.commit()
+                    logging.info(f"Updated scan {scan_id} status to {status['status']}")
+
+                # Send any remaining events
+                events = scan_worker_pool.get_events(scan_id, last_event_id)
+                for event in events:
+                    last_event_id += 1
+                    yield f"event: {event['event']}\ndata: {json.dumps(event['data'])}\nid: {last_event_id}\n\n"
+
+                logging.debug(f"Scan {scan_id} {status['status']}, closing event stream")
+                break
+
+            # Get new events
+            events = scan_worker_pool.get_events(scan_id, last_event_id)
+            if events:
+                retry_count = 0  # Reset retry count when we get events
+                for event in events:
+                    last_event_id += 1
+                    yield f"event: {event['event']}\ndata: {json.dumps(event['data'])}\nid: {last_event_id}\n\n"
+            else:
+                retry_count += 1
+                if retry_count >= max_retries:
+                    logging.warning(f"Event stream timeout for scan {scan_id}")
+                    yield f"event: scan_error\ndata: {json.dumps({'error': 'Event stream timeout'})}\n\n"
+                    break
+                time.sleep(1)  # Wait before next poll
+
+    return Response(
+        stream_with_context(event_stream()),
+        mimetype='text/event-stream'
+    )

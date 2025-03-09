@@ -1,377 +1,213 @@
 {% extends "base.html" %}
 
-{% block title %} - Scan Report{% endblock %}
+{% block title %} - Scan Results{% endblock %}
 
 {% block content %}
 <div class="container py-4">
-    <!-- Scan Status Bar -->
+    <!-- Scan Information Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h2 mb-0">Vulnerability Scan Report</h1>
+        <h1 class="h2">Vulnerability Scan Results</h1>
         <div class="d-flex align-items-center">
-            <!-- Severity Filter Buttons -->
-            <div class="btn-group me-3" role="group" aria-label="Severity filters">
-                <button type="button" class="btn btn-outline-secondary active" data-severity="all">
-                    All
-                </button>
-                <button type="button" class="btn btn-outline-danger" data-severity="high">
-                    High
-                </button>
-                <button type="button" class="btn btn-outline-warning" data-severity="medium">
-                    Medium
-                </button>
-                <button type="button" class="btn btn-outline-info" data-severity="low">
-                    Low
-                </button>
-            </div>
-            <!-- Export Options -->
-            <div class="dropdown">
-                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                    <i class="fas fa-download me-2"></i>Export
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item" href="{{ url_for('export_report', report_id=report.id, format='html') }}">HTML</a></li>
-                    <li><a class="dropdown-item" href="{{ url_for('export_report', report_id=report.id, format='json') }}">JSON</a></li>
-                </ul>
-            </div>
+            {% if scan.status == 'in_progress' %}
+            <span class="badge bg-info me-2" id="scanStatus">
+                <span class="spinner-border spinner-border-sm me-2"></span>
+                Scanning in Progress
+            </span>
+            <button class="btn btn-outline-danger" id="cancelScan">
+                <i class="fas fa-times me-2"></i>Cancel
+            </button>
+            {% elif scan.status == 'completed' %}
+            <span class="badge bg-success me-2">Completed</span>
+            {% elif scan.status == 'failed' %}
+            <span class="badge bg-danger me-2">Failed</span>
+            {% endif %}
         </div>
     </div>
 
-    <!-- Scan Meta Information -->
+    <!-- Target Information -->
     <div class="card bg-dark text-light border-secondary mb-4">
         <div class="card-body">
             <div class="row">
                 <div class="col-md-6">
-                    <h5 class="card-title mb-3">Target Information</h5>
-                    <p class="mb-2"><i class="fas fa-globe me-2"></i><strong>URL:</strong> {{ scan.target }}</p>
-                    <p class="mb-2"><i class="fas fa-tasks me-2"></i><strong>Scan Type:</strong> {{ scan.scan_type|title }}</p>
-                    <p class="mb-2"><i class="fas fa-server me-2"></i><strong>Server:</strong> {{ report.get_response_details().get('headers', {}).get('Server', 'Unknown') }}</p>
+                    <h5><i class="fas fa-globe me-2"></i>Target Information</h5>
+                    <p class="mb-2">URL: {{ scan.target }}</p>
+                    <p class="mb-2">Scan Type: {{ scan.scan_type|title }}</p>
                 </div>
-                <div class="col-md-6 text-md-end">
-                    <h5 class="card-title mb-3">Scan Timeline</h5>
-                    <p class="mb-2"><i class="fas fa-play me-2"></i><strong>Started:</strong> {{ scan.started_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                <div class="col-md-6 text-end">
+                    <h5><i class="fas fa-clock me-2"></i>Scan Timeline</h5>
+                    <p class="mb-2">Started: {{ scan.started_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
                     {% if scan.completed_at %}
-                    <p class="mb-2"><i class="fas fa-flag-checkered me-2"></i><strong>Completed:</strong> {{ scan.completed_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                    <p>Completed: {{ scan.completed_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Vulnerability Statistics -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card bg-danger text-white">
-                <div class="card-body text-center">
-                    <div class="d-flex align-items-center justify-content-center mb-2">
-                        <i class="fas fa-exclamation-triangle fa-2x me-2"></i>
-                        <h5 class="card-title mb-0">High Risk</h5>
-                    </div>
-                    <h2 class="mb-0 high-risk-count">{{ report.get_severity_counts()['high'] }}</h2>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-warning text-dark">
-                <div class="card-body text-center">
-                    <div class="d-flex align-items-center justify-content-center mb-2">
-                        <i class="fas fa-exclamation-circle fa-2x me-2"></i>
-                        <h5 class="card-title mb-0">Medium Risk</h5>
-                    </div>
-                    <h2 class="mb-0 medium-risk-count">{{ report.get_severity_counts()['medium'] }}</h2>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-info text-white">
-                <div class="card-body text-center">
-                    <div class="d-flex align-items-center justify-content-center mb-2">
-                        <i class="fas fa-info-circle fa-2x me-2"></i>
-                        <h5 class="card-title mb-0">Low Risk</h5>
-                    </div>
-                    <h2 class="mb-0 low-risk-count">{{ report.get_severity_counts()['low'] }}</h2>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-secondary text-white">
-                <div class="card-body text-center">
-                    <div class="d-flex align-items-center justify-content-center mb-2">
-                        <i class="fas fa-eye fa-2x me-2"></i>
-                        <h5 class="card-title mb-0">Info</h5>
-                    </div>
-                    <h2 class="mb-0 info-count">{{ report.get_severity_counts()['info'] }}</h2>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Detailed Findings -->
+    <!-- Vulnerability Report -->
+    {% if report and scan.status == 'completed' %}
     <div class="card bg-dark text-light border-secondary mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title mb-0">
-                <i class="fas fa-shield-alt me-2"></i>
-                Detected Vulnerabilities
-            </h5>
+            <h5 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Vulnerabilities Found</h5>
             <div class="btn-group">
-                <button class="btn btn-outline-secondary btn-sm" id="expandAll">
-                    <i class="fas fa-expand-alt me-1"></i>Expand All
-                </button>
-                <button class="btn btn-outline-secondary btn-sm" id="collapseAll">
-                    <i class="fas fa-compress-alt me-1"></i>Collapse All
-                </button>
+                <a href="{{ url_for('export_report', report_id=report.id, format='json') }}" 
+                   class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-file-code me-1"></i>Export JSON
+                </a>
+                <a href="{{ url_for('export_report', report_id=report.id, format='pdf') }}" 
+                   class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-file-pdf me-1"></i>Export PDF
+                </a>
             </div>
         </div>
         <div class="card-body">
+            <!-- Risk Summary -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="alert alert-danger mb-0 text-center">
+                        <h6 class="alert-heading">High Risk</h6>
+                        <h3 class="mb-0">{{ report.summary.high }}</h3>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="alert alert-warning mb-0 text-center">
+                        <h6 class="alert-heading">Medium Risk</h6>
+                        <h3 class="mb-0">{{ report.summary.medium }}</h3>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="alert alert-info mb-0 text-center">
+                        <h6 class="alert-heading">Low Risk</h6>
+                        <h3 class="mb-0">{{ report.summary.low }}</h3>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="alert alert-secondary mb-0 text-center">
+                        <h6 class="alert-heading">Info</h6>
+                        <h3 class="mb-0">{{ report.summary.info }}</h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vulnerabilities List -->
+            {% if report.vulnerabilities %}
             <div class="accordion" id="vulnAccordion">
-                {% if report.vulnerabilities %}
-                    {% for vuln in report.vulnerabilities %}
-                    <div class="accordion-item bg-dark border-secondary vulnerability-item" data-severity="{{ vuln.severity|lower }}">
-                        <h2 class="accordion-header" id="heading{{ loop.index }}">
-                            <button class="accordion-button bg-dark text-light collapsed" type="button" 
-                                    data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}">
-                                <div class="d-flex align-items-center w-100">
-                                    <span class="badge bg-{{ vuln.severity|lower }} me-3">{{ vuln.severity|upper }}</span>
-                                    <i class="fas {{ 'fa-exclamation-triangle' if vuln.severity == 'high' 
-                                                   else 'fa-exclamation-circle' if vuln.severity == 'medium'
-                                                   else 'fa-info-circle' }} me-2"></i>
-                                    {{ vuln.type|replace('_', ' ')|title }}
-                                </div>
-                            </button>
-                        </h2>
-                        <div id="collapse{{ loop.index }}" class="accordion-collapse collapse" 
-                             data-bs-parent="#vulnAccordion">
-                            <div class="accordion-body">
-                                <!-- Vulnerability Details -->
-                                <div class="mb-4">
-                                    <h6 class="text-info mb-3">
-                                        <i class="fas fa-info-circle me-2"></i>Description
-                                    </h6>
-                                    <div class="bg-dark p-3 rounded border border-secondary">
-                                        {{ vuln.details }}
-                                    </div>
-                                </div>
-
-                                <!-- HTTP Request Details -->
-                                <div class="mb-4">
-                                    <h6 class="text-info mb-3">
-                                        <i class="fas fa-arrow-right me-2"></i>HTTP Request
-                                    </h6>
-                                    <div class="bg-dark p-3 rounded border border-secondary">
-                                        <pre class="mb-0"><code class="language-http">{% set request_data = vuln.get('request_data', {}) %}Method: {{ request_data.get('method', 'GET') }}
-URL: {{ request_data.get('url', '') }}
-Headers: {{ request_data.get('headers', {}) | tojson(indent=2) if request_data.get('headers') else '{}' }}
-Body: {% if request_data.get('body') %}{{ request_data.get('body') | tojson(indent=2) }}{% else %}{}{% endif %}</code></pre>
-                                    </div>
-                                </div>
-
-                                <!-- HTTP Response Details -->
-                                <div class="mb-4">
-                                    <h6 class="text-info mb-3">
-                                        <i class="fas fa-arrow-left me-2"></i>HTTP Response
-                                    </h6>
-                                    <div class="bg-dark p-3 rounded border border-secondary">
-                                        <pre class="mb-0"><code class="language-http">{% set response_data = vuln.get('response_data', {}) %}Status Code: {{ response_data.get('status_code', 0) }}
-Headers: {{ response_data.get('headers', {}) | tojson(indent=2) if response_data.get('headers') else '{}' }}
-Body: {% if response_data.get('body') %}{{ response_data.get('body') | tojson(indent=2) }}{% else %}{}{% endif %}</code></pre>
-                                    </div>
-                                </div>
-
-                                <!-- AI Analysis -->
-                                {% set ai_analysis = report.get_ai_analysis() %}
-                                {% if ai_analysis %}
-                                <div class="mb-4">
-                                    <h6 class="text-info mb-3">
-                                        <i class="fas fa-brain me-2"></i>AI Analysis
-                                    </h6>
-                                    <div class="card bg-dark border-secondary">
-                                        <div class="card-body">
-                                            <!-- Risk Assessment -->
-                                            <div class="mb-3">
-                                                <h6 class="text-warning mb-2">
-                                                    <i class="fas fa-chart-line me-2"></i>Risk Assessment
-                                                </h6>
-                                                <p class="mb-0">{{ ai_analysis.risk_assessment }}</p>
-                                            </div>
-
-                                            <!-- Potential Impact -->
-                                            <div class="mb-3">
-                                                <h6 class="text-danger mb-2">
-                                                    <i class="fas fa-bomb me-2"></i>Potential Impact
-                                                </h6>
-                                                <p class="mb-0">{{ ai_analysis.potential_impact }}</p>
-                                            </div>
-
-                                            <!-- Recommended Fixes -->
-                                            <div class="mb-3">
-                                                <h6 class="text-success mb-2">
-                                                    <i class="fas fa-tools me-2"></i>Recommended Fixes
-                                                </h6>
-                                                <ul class="list-unstyled mb-0">
-                                                    {% for fix in ai_analysis.recommended_fixes %}
-                                                    <li class="mb-2">
-                                                        <i class="fas fa-check-circle text-success me-2"></i>{{ fix }}
-                                                    </li>
-                                                    {% endfor %}
-                                                </ul>
-                                            </div>
-
-                                            <!-- Best Practices -->
-                                            <div class="mb-0">
-                                                <h6 class="text-primary mb-2">
-                                                    <i class="fas fa-book me-2"></i>Security Best Practices
-                                                </h6>
-                                                <ul class="list-unstyled mb-0">
-                                                    {% for practice in ai_analysis.best_practices %}
-                                                    <li class="mb-2">
-                                                        <i class="fas fa-shield-alt text-primary me-2"></i>{{ practice }}
-                                                    </li>
-                                                    {% endfor %}
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                {% endif %}
+                {% for vuln in report.vulnerabilities %}
+                <div class="accordion-item bg-dark border-secondary">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button bg-dark text-light collapsed" type="button" 
+                                data-bs-toggle="collapse" data-bs-target="#vuln{{ loop.index }}">
+                            <div class="d-flex align-items-center w-100">
+                                <span class="badge bg-{{ vuln.severity|lower }} me-3">{{ vuln.severity|upper }}</span>
+                                <i class="fas fa-bug me-2"></i>
+                                {{ vuln.type }}
                             </div>
+                        </button>
+                    </h2>
+                    <div id="vuln{{ loop.index }}" class="accordion-collapse collapse" data-bs-parent="#vulnAccordion">
+                        <div class="accordion-body">
+                            <div class="mb-3">
+                                <h6 class="text-info mb-2">Description</h6>
+                                <p>{{ vuln.details }}</p>
+                            </div>
+                            {% if vuln.request %}
+                            <div class="mb-3">
+                                <h6 class="text-info mb-2">Request Details</h6>
+                                <pre class="bg-darker p-2 rounded">
+                                    <code>{{ vuln.request|tojson(indent=2) }}</code>
+                                </pre>
+                            </div>
+                            {% endif %}
+                            {% if vuln.response %}
+                            <div class="mb-3">
+                                <h6 class="text-info mb-2">Response Details</h6>
+                                <pre class="bg-darker p-2 rounded">
+                                    <code>{{ vuln.response|tojson(indent=2) }}</code>
+                                </pre>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
-                    {% endfor %}
-                {% else %}
-                    <p class="text-muted text-center my-4">No vulnerabilities detected in this scan.</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <!-- Add Threat Intelligence Section -->
-    {% set threat_intel = report.get_threat_intel() %}
-    {% if threat_intel %}
-    <div class="mb-4">
-        <h6 class="text-info mb-3">
-            <i class="fas fa-shield-virus me-2"></i>Threat Intelligence
-        </h6>
-        <div class="card bg-dark border-secondary">
-            <div class="card-body">
-                <!-- CVE Information -->
-                {% for threat in threat_intel %}
-                {% if threat.type == 'cve' %}
-                <div class="mb-3">
-                    <h6 class="text-warning mb-2">
-                        <i class="fas fa-bug me-2"></i>CVE Information
-                    </h6>
-                    <div class="ps-3">
-                        <p class="mb-1"><strong>ID:</strong> {{ threat.cve_id }}</p>
-                        <p class="mb-1"><strong>Title:</strong> {{ threat.title }}</p>
-                        <p class="mb-1"><strong>Severity:</strong> 
-                            <span class="badge bg-{{ 'danger' if threat.severity == 'HIGH' 
-                                else 'warning' if threat.severity == 'MEDIUM'
-                                else 'info' }}">
-                                {{ threat.severity }}
-                            </span>
-                        </p>
-                        <p class="mb-1"><strong>CVSS Score:</strong> {{ threat.cvss_score }}</p>
-                        <p class="mb-1"><strong>Published:</strong> {{ threat.published_date }}</p>
-                        <p class="mb-2"><strong>Description:</strong> {{ threat.description }}</p>
-                        {% if threat.mitigations %}
-                        <p class="mb-1"><strong>Mitigations:</strong></p>
-                        <p class="mb-0">{{ threat.mitigations }}</p>
-                        {% endif %}
-                    </div>
                 </div>
-                {% endif %}
-
-                {% if threat.type == 'indicator' %}
-                <div class="mb-3">
-                    <h6 class="text-danger mb-2">
-                        <i class="fas fa-exclamation-triangle me-2"></i>Threat Indicator
-                    </h6>
-                    <div class="ps-3">
-                        <p class="mb-1"><strong>Type:</strong> {{ threat.indicator_type }}</p>
-                        <p class="mb-1"><strong>Value:</strong> {{ threat.value }}</p>
-                        <p class="mb-1"><strong>Threat Type:</strong> {{ threat.threat_type }}</p>
-                        <p class="mb-1"><strong>Confidence:</strong> {{ "%.1f"|format(threat.confidence_score * 100) }}%</p>
-                        <p class="mb-1"><strong>First Seen:</strong> {{ threat.first_seen }}</p>
-                        <p class="mb-0"><strong>Last Seen:</strong> {{ threat.last_seen }}</p>
-                    </div>
-                </div>
-                {% endif %}
                 {% endfor %}
             </div>
+            {% else %}
+            <p class="text-center text-muted my-4">No vulnerabilities were found during this scan.</p>
+            {% endif %}
         </div>
+    </div>
+    {% endif %}
+
+    {% if scan.status == 'in_progress' %}
+    <!-- Progress Indicator -->
+    <div class="text-center p-4">
+        <div class="spinner-border text-info" role="status">
+            <span class="visually-hidden">Scanning...</span>
+        </div>
+        <p class="mt-3">Scanning target for vulnerabilities...</p>
     </div>
     {% endif %}
 </div>
 
-<!-- Add Prism.js for syntax highlighting -->
-<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism-tomorrow.min.css" rel="stylesheet" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/prism.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-http.min.js"></script>
-
-<!-- Expand/Collapse Script -->
+{% if scan.status == 'in_progress' %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const expandAllBtn = document.getElementById('expandAll');
-    const collapseAllBtn = document.getElementById('collapseAll');
-    const accordionItems = document.querySelectorAll('.accordion-collapse');
+    const scanStatus = document.getElementById('scanStatus');
+    const cancelButton = document.getElementById('cancelScan');
 
-    expandAllBtn.addEventListener('click', () => {
-        accordionItems.forEach(item => {
-            item.classList.add('show');
-        });
-    });
+    // Cancel scan functionality
+    if (cancelButton) {
+        cancelButton.addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to cancel this scan?')) return;
 
-    collapseAllBtn.addEventListener('click', () => {
-        accordionItems.forEach(item => {
-            item.classList.remove('show');
-        });
-    });
+            try {
+                const response = await fetch("{{ url_for('cancel_scan', scan_id=scan.id) }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
 
-    // Initialize Prism.js syntax highlighting
-    Prism.highlightAll();
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
-    // Severity filter functionality
-    const filterButtons = document.querySelectorAll('[data-severity]');
-    const vulnerabilityItems = document.querySelectorAll('.vulnerability-item');
-
-    filterButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            // Update active state of buttons
-            filterButtons.forEach(btn => btn.classList.remove('active'));
-            button.classList.add('active');
-
-            const selectedSeverity = button.dataset.severity;
-
-            vulnerabilityItems.forEach(item => {
-                if (selectedSeverity === 'all' || item.dataset.severity === selectedSeverity) {
-                    item.style.display = '';
-                } else {
-                    item.style.display = 'none';
+                const data = await response.json();
+                if (data.status === 'cancelled') {
+                    location.reload();
                 }
-            });
+            } catch (error) {
+                console.error('Error cancelling scan:', error);
+                alert('Failed to cancel scan. Please try again.');
+            }
         });
+    }
+
+    // Check scan status periodically
+    const checkStatus = async () => {
+        try {
+            const response = await fetch("{{ url_for('scan_status', scan_id=scan.id) }}");
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+            const data = await response.json();
+            if (data.status === 'completed') {
+                location.reload();
+            } else if (data.status === 'failed') {
+                scanStatus.innerHTML = '<i class="fas fa-exclamation-circle me-2"></i>Failed';
+                scanStatus.classList.replace('bg-info', 'bg-danger');
+                cancelButton.style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Error checking scan status:', error);
+        }
+    };
+
+    // Check status every 5 seconds
+    const statusInterval = setInterval(checkStatus, 5000);
+
+    // Clean up interval when leaving page
+    window.addEventListener('beforeunload', () => {
+        clearInterval(statusInterval);
     });
 });
-
-// Progress Update Script for In-Progress Scans
-{% if scan.status == 'in_progress' %}
-const checkStatus = async () => {
-    try {
-        const response = await fetch("{{ url_for('scan_status', scan_id=scan.id) }}");
-        const data = await response.json();
-
-        if (data.status === 'completed') {
-            window.location.reload();
-        } else if (data.status === 'failed') {
-            return;
-        }
-
-        setTimeout(checkStatus, 2000);
-    } catch (error) {
-        console.error('Error checking scan status:', error);
-    }
-};
-
-checkStatus();
-{% endif %}
 </script>
+{% endif %}
 {% endblock %}

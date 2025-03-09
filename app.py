@@ -11,22 +11,21 @@ class Base(DeclarativeBase):
 db = SQLAlchemy(model_class=Base)
 app = Flask(__name__)
 
+SESSION_SECRET="Zwbp337xMDMJFxhg"
+
 # Configure the application
-if not os.environ.get("SESSION_SECRET"):
+if not SESSION_SECRET:
     print("Error: SESSION_SECRET environment variable is not set", file=sys.stderr)
     sys.exit(1)
 
-app.secret_key = os.environ.get("SESSION_SECRET")
+app.secret_key = "Zwbp337xMDMJFxhg"
 
 # Handle database URL configuration with error checking
-database_url = os.environ.get("DATABASE_URL")
+database_url = "sqlite:///vulnscanner.db"
 if not database_url:
     print("Error: DATABASE_URL environment variable is not set", file=sys.stderr)
     sys.exit(1)
 
-# Convert postgres:// to postgresql:// if necessary
-if database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
 
 # Configure SQLAlchemy
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url

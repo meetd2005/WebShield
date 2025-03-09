@@ -4,6 +4,7 @@ from flask_login import LoginManager, UserMixin, login_required, login_user, log
 import bcrypt
 import os
 
+
 # Import the db and app instances from the main app
 from app import app, db, login_manager
 
