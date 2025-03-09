@@ -101,8 +101,8 @@ We welcome contributions! Please follow these steps:
 ## Contributors
 We appreciate the following contributors who helped build WebShield:
 - [Meet Darji](https://github.com/yourusername)
-- [Ankit Sharma]((https://github.com/Ankitsharma8369))
-- [Ankit Sharma](https://github.com/ankit-dev-007)
+- [Ankit Sharma](https://github.com/Ankitsharma8369)
+- [Ankit Pandey](https://github.com/ankit-dev-007)
 
 
 
