@@ -11,7 +11,7 @@ class Base(DeclarativeBase):
 db = SQLAlchemy(model_class=Base)
 app = Flask(__name__)
 
-SESSION_SECRET="Zwbp337xMDMJFxhg"
+SESSION_SECRET="yoursecret"
 
 # Configure the application
 if not SESSION_SECRET:
